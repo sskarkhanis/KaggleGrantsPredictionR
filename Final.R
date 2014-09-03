@@ -264,5 +264,5 @@ length(cc)
 
 grants <- grants[,-(cc),with=F]
 tmp.Contract.Value.Band...see.note.A <- grants$Contract.Value.Band...see.note.A
-grants$Contract.Value.Band...see.note.A <- NULL
+grants[,Contract.Value.Band...see.note.A:=NULL]  
 View(grants)
