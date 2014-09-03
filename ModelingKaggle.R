@@ -27,7 +27,8 @@ if(require("nnet")==FALSE) install.packages("nnet") ; library(nnet)
 
 ##########################################################################################################
 #Data Splitting
-
+Basetable <- grants
+class(Basetable) <- 
 #randomize order of indicators
 Basetable$Start.date<-as.Date(Basetable$Start.date,format="%d/%m/%y")
 

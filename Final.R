@@ -187,6 +187,12 @@ grants[,Sum.PHD:=with_phd[,Sum.PHD]]
 sum_grants<-investigators[,list(Sum.of.Successful.Grant=sum(Number.of.Successful.Grant,na.rm=TRUE),Sum.of.Unsuccessful.Grant=sum(Number.of.Unsuccessful.Grant,na.rm=TRUE)),by='Grant.Application.ID']
 grants$Sum.of.Successful.Grant<-sum_grants[,Sum.of.Successful.Grant]
 grants$Sum.of.Unsuccessful.Grant<-sum_grants[,Sum.of.Unsuccessful.Grant]
+
+# Remove empty spaces from Countries 
+countries<-levels(investigators$Country.of.Birth)
+levels(investigators$Country.of.Birth)<-unlist(lapply(countries, function(x)
+  stri_replace_all_fixed(x,pattern = ' ',replacement = '.')))
+
 ########################################SK Part########################################
 
 
@@ -271,8 +277,5 @@ grants[,Contract.Value.Band...see.note.A:=NULL]
 #sum the publications
 grants[,Sum.Publications:=A.+A+B+C,by='Grant.Application.ID']
 
-# Remove empty spaces from Countries 
-countries<-levels(investigators$Country.of.Birth)
-levels(investigators$Country.of.Birth)<-unlist(lapply(countries, function(x)
-  stri_replace_all_fixed(x,pattern = ' ',replacement = '.')))
+
 
