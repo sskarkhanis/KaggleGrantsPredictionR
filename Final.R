@@ -193,6 +193,11 @@ countries<-levels(investigators$Country.of.Birth)
 levels(investigators$Country.of.Birth)<-unlist(lapply(countries, function(x)
   stri_replace_all_fixed(x,pattern = ' ',replacement = '.')))
 
+#get number of investigators per grant
+nr_inv<-investigators[,list(Number.of.Investivators=.N),by='Grant.Application.ID']
+grants$Number.of.Investigators<-nr_inv$Number.of.Investivators
+
+
 ########################################SK Part########################################
 
 
