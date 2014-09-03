@@ -134,13 +134,16 @@ class(grants)<-'data.frame'
 
 grants2<-copy(grants)
 
+#Replace NAs with 0
+grants[is.na(grants)] <- 0
+
 for (i in 1:5)
     {
       tmp1 <- paste0('t_rfcdcode',i)
       tmp2 <- paste0('RFCD.Code.',i)
       #grants[,tmp1] <- substr(unlist(grants[,tmp2,with=FALSE]),1,2)
       grants[,tmp1] <- substr(unlist(grants[tmp2]),1,2)
-      grants <- merge(rfcdlookup,grants,by.x='RFCD.Code',by.y=(tmp1),sort=T,all.y=T,incomparables=NA,NA.last=T)
+      grants <- merge(rfcdlookup,grants,by.x='RFCD.Code',by.y=(tmp1),sort=T,incomparables=NA,,all.y=T,NA.last=T)
       grants['RFCD.Code'] <- NULL
       grants[tmp1] <- NULL
       names(grants)[names(grants) == 'RFCD.DESC'] <- paste0('RFCD.DESC.',i)
@@ -200,6 +203,7 @@ grants$Number.of.Investigators<-nr_inv$Number.of.Investivators
 
 ########################################SK Part########################################
 
+NA.find <- function(x) length(which(is.na(x))) #function for finding missing values
 
 tmp_sk <- subset(investigators,select=c('Grant.Application.ID','Role','Year.of.Birth','Country.of.Birth',"A.","A","B","C"))
 #setkey(tmp_sk,Grant.Application.ID)
@@ -218,7 +222,7 @@ levels(tmp_sk$Country.of.Birth)[1] <- 'Unknown'
 #calculating age
 tmp_sk$Age <- (year(today()) - tmp_sk[,Year.of.Birth]) 
 #creating a dummy indicator where Age is NA
-tmp_sk$d_age_ind <- ifelse((is.na(tmp_sk$Age) == T),1,0)
+#tmp_sk$d_age_ind <- ifelse((is.na(tmp_sk$Age) == T),1,0)
 
 #imputing 0 where Age == NA
 #tmp_sk$Age[is.na(tmp_sk$Age)==T] <- NA
@@ -237,6 +241,12 @@ tmp_sk_Age <- aggregate(tmp_sk2["Age"],tmp_sk2["Grant.Application.ID"],mean,na.r
 
 # There are grants where all people have NA age
 tmp_sk_Age$Age[is.nan(tmp_sk_Age$Age)]<-NA
+
+#creating a dummy indicator where age is NA
+tmp_sk_Age$d_age_ind <- ifelse((is.na(tmp_sk_Age$Age) == T),1,0)
+
+#imputing age where age == NA
+tmp_sk_Age[is.na(tmp_sk_Age$Age),'Age'] <- round(mean(tmp_sk_Age$Age,na.rm=T))
 hist(tmp_sk_Age$Age)
 
 #data table containing aggregate Application ID by Country of Birth

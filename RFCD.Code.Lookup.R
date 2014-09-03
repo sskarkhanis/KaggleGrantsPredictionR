@@ -78,8 +78,8 @@ rfcd.id <-c(21,
             42,
             43,
             44,
-            00,
-            99
+            99,
+            00
 )
 
 rfcdlookup <- data.frame(cbind(rfcd.id,rfcd.desc))

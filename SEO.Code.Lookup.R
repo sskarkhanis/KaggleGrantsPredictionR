@@ -63,8 +63,8 @@ seo.id <-c(61,
             76, 
             77, 
             78, 
-            99, 
-            00
+            00, 
+            99
           )
 
 seolookup <- data.frame(cbind(seo.id,seo.desc))

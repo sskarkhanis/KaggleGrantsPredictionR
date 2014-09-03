@@ -28,7 +28,7 @@ if(require("nnet")==FALSE) install.packages("nnet") ; library(nnet)
 ##########################################################################################################
 #Data Splitting
 Basetable <- grants
-class(Basetable) <- 
+#class(Basetable) <- 'data.frame'
 #randomize order of indicators
 Basetable$Start.date<-as.Date(Basetable$Start.date,format="%d/%m/%y")
 
@@ -51,18 +51,21 @@ testind  <- allind[round(length(allind)*(2/3)+1):length(allind)]
 
 #testind  <- allind[-trainind]
 
-BasetableTRAIN <- training_grants[trainind,]
-BasetableVAL   <- training_grants[valind,]
-BasetableTEST  <- training_grants[testind,]
+BasetableTRAIN <- training_grants[trainind,] ; class(BasetableTRAIN) <- 'data.frame'
+BasetableVAL   <- training_grants[valind,] ; class(BasetableVAL) <- 'data.frame'
+BasetableTEST  <- training_grants[testind,] ; class(BasetableTEST) <- 'data.frame'
 
 #isolate the response variable
 yTRAIN <- BasetableTRAIN$Grant.Status
+#BasetableTRAIN[,Grant.Status:=NULL] 
 BasetableTRAIN$Grant.Status <- NULL
 
 yVAL <- BasetableVAL$Grant.Status
+#BasetableVAL[,Grant.Status:=NULL] 
 BasetableVAL$Grant.Status <- NULL
 
 yTEST <- BasetableTEST$Grant.Status
+#BasetableTEST[,Grant.Status:=NULL] 
 BasetableTEST$Grant.Status <- NULL
 
 table(yTRAIN);table(yVAL);table(yTEST)
@@ -77,9 +80,9 @@ dim(BasetableVAL)
 dim(BasetableTEST)
 
 # ?intersect
-intersect(rownames(BasetableTRAIN),rownames(BasetableTEST))
-intersect(rownames(BasetableTRAIN),rownames(BasetableVAL))
-intersect(rownames(BasetableTEST) ,rownames(BasetableVAL))
+# intersect(rownames(BasetableTRAIN),rownames(BasetableTEST))
+# intersect(rownames(BasetableTRAIN),rownames(BasetableVAL))
+# intersect(rownames(BasetableTEST) ,rownames(BasetableVAL))
 #intersection is empty so we can proceed
 
 
@@ -87,11 +90,13 @@ intersect(rownames(BasetableTEST) ,rownames(BasetableVAL))
 #BOOSTING
 
 ?ada
-ABmodel <- ada(Grant.Status ~ . ,BasetableTRAIN,iter=50)
+ABmodel <- ada(yTRAIN ~ . ,BasetableTRAIN,iter=500)
 predAB <- as.numeric(predict(ABmodel,BasetableTEST,type="probs")[,2])
 
 #plotting learning curve
-ABmodel <- ada(x=BasetableTRAIN[,names(BasetableTRAIN)!= "Grant.Status"],y=BasetableTRAIN$Grant.Status,test.x=BasetableTEST[,names(BasetableTEST)!= "Grant.Status"],test.y=BasetableTEST$Grant.Status,iter=50)
+#ABmodel <- ada(x=BasetableTRAIN[,names(BasetableTRAIN)!= "Grant.Status"],y=BasetableTRAIN$Grant.Status,test.x=BasetableTEST[,names(BasetableTEST)!= "Grant.Status"],test.y=BasetableTEST$Grant.Status,iter=50)
+ABmodel <- ada(x=BasetableTRAIN ,y=yTRAIN,test.x=BasetableTEST ,test.y=yTEST,iter=500)
+
 plot(ABmodel,test=TRUE)
 
 #variable importances
@@ -105,7 +110,7 @@ summary(ABmodel)
 ##########################################################################################################
 #RANDOM FOREST
 
-rFmodel <- randomForest(x=BasetableTRAIN[,names(BasetableTRAIN)!= "Grant.Status"],y=BasetableTRAIN$Grant.Status,  ntree=1000, importance=TRUE)
+rFmodel <- randomForest(x=BasetableTRAIN ,y=factor(yTRAIN),  ntree=1000, importance=TRUE)
 
 #look at the importance of the variables
 importance(rFmodel)
@@ -125,7 +130,7 @@ head(plot(rFmodel))
 #FNN -> fast nearest neighbours
 #the knnx function requires all indicators to be numeric so we first convert our data
 trainKNN <- data.frame(sapply(BasetableTRAIN, function(x) as.numeric(as.character(x))))
-trainKNNbig <- data.frame(sapply(BasetableTRAINbig, function(x) as.numeric(as.character(x))))   
+#trainKNNbig <- data.frame(sapply(BasetableTRAINbig, function(x) as.numeric(as.character(x))))   
 valKNN <- data.frame(sapply(BasetableVAL, function(x) as.numeric(as.character(x))))
 testKNN <- data.frame(sapply(BasetableTEST, function(x) as.numeric(as.character(x))))
 
@@ -134,7 +139,7 @@ testKNN <- data.frame(sapply(BasetableTEST, function(x) as.numeric(as.character(
 #example for 10 nearest neighbors:
 k=10
 #retrieve the indicators of the k nearest neighbors of the query data 
-indicatorsKNN <- as.integer(knnx.index(data=trainKNNbig, query=BasetableTEST, k=k))
+indicatorsKNN <- as.integer(knnx.index(data=BasetableTRAINbig, query=BasetableTEST, k=k))
 #retrieve the actual y from the tarining set
 predKNN <- as.integer(as.character(yTRAINbig[indicatorsKNN]))
 #if k > 1 than we take the proportion of 1s
@@ -272,7 +277,7 @@ BasetableTRAINnum <- BasetableTRAIN[, BasetableTRAINnumID]
 
 minima <- sapply(BasetableTRAINnum,min)
 scaling <- sapply(BasetableTRAINnum,max)-minima
-?scale
+#?scale
 #center is subtracted from each column. Because we use the minima this sets the minimum to zero.
 #scale: each column is divided by scale. Because we use the range this sets the maximum to one.
 BasetableTRAINscaled <- data.frame(base::scale(BasetableTRAINnum,center=minima,scale=scaling), BasetableTRAIN[,!BasetableTRAINnumID])
@@ -322,9 +327,9 @@ predNN <- as.numeric(predict(NN,BasetableTESTscaled,type="raw"))
 
 #AUC and ROC curve of AdaBoost model
 
-(AUC_adaboost <- performance(prediction(predAB ,BasetableTEST$Grant.Status),"auc")@y.values[[1]])
+(AUC_adaboost_CV1 <- performance(prediction (predAB ,yTEST),"auc")@y.values[[1]])
 
-plot(performance(prediction(predAB ,BasetableTEST$Grant.Status), "tpr", "fpr"))
+plot(performance(prediction(predAB ,yTEST), "tpr", "fpr"))
 
 
 #AUC and ROC curve of Random Forest model
