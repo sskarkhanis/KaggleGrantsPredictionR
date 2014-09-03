@@ -265,4 +265,11 @@ length(cc)
 grants <- grants[,-(cc),with=F]
 tmp.Contract.Value.Band...see.note.A <- grants$Contract.Value.Band...see.note.A
 grants$Contract.Value.Band...see.note.A <- NULL
-View(grants)
+
+#sum the publications
+grants[,Sum.Publications:=A.+A+B+C,by='Grant.Application.ID']
+
+# Remove empty spaces from Countries 
+countries<-levels(investigators$Country.of.Birth)
+levels(investigators$Country.of.Birth)<-unlist(lapply(countries, function(x)
+  stri_replace_all_fixed(x,pattern = ' ',replacement = '.')))
