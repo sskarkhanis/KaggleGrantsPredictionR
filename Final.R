@@ -13,25 +13,20 @@
 ## These computations will take a fair amount of time and may consume
 ## a non-trivial amount of memory in the process.
 ##
-set.seed(108)
 
+ 
 pckg = c('caret','MASS','data.table','lubridate','plyr','sqldf','stringi','reshape2')
+ 
 
-install.packages(pckg,dependencies=T)
+rm(list=ls())
 
 ## Load required libraries
-require(caret)
-require(MASS)
-require(data.table)
-require(lubridate) 
-require(plyr)
-require(sqldf)
-require(stringi)
-
-#help(package=data.table)
-
-#rm(list=ls())
-
+library(plyr)
+library(caret)
+library(lubridate)
+library(data.table)
+library(stringi)
+library(reshape2)
 ## How many cores on the machine should be used for the data
 ## processing. Making cores > 1 will speed things up (depending on your
 ## machine) but will consume more memory.
@@ -44,8 +39,8 @@ if(cores > 1){
 }
 
 # Note: when using parallel=T, there are always a couple of warnings: 
-#   Warning messages:
-#   1: <anonymous>: ... may be used in an incorrect context: '.fun(piece, ...)'
+# Warning messages:
+# 1: <anonymous>: ... may be used in an incorrect context: '.fun(piece, ...)'
 # 2: <anonymous>: ... may be used in an incorrect context: '.fun(piece, ...)'
 # The issue is open on github: https://github.com/hadley/plyr/issues/203
 # 
@@ -60,7 +55,6 @@ if(cores > 1){
 ## such as "Dept.No" instead of "Dept No"
 
 #setwd("~/SkyDrive/DSR-docs/dsrteach/grants/data")
-setwd('/Users/skarkhanis/Desktop/DSR 2014/KaggleGrants')
 raw <- read.csv("unimelb_training.csv")
 
 ## In many cases, missing values in categorical data will be converted
@@ -80,8 +74,7 @@ raw$Contract.Value.Band...see.note.A <- factor(paste("ContractValueBand", raw$Co
 #raw$Role.1 <- as.character(raw$Role.1)
 #raw$Role.1[raw$Role.1 == ""] <- "Unk"
 
-
-invT<-data.table()
+investigators<-data.table()
 columns<-colnames(raw)
 #get the columns that are named Person.X
 id_columns<-which(!is.na(stri_match_first(columns,regex='Person.ID')))
@@ -98,67 +91,103 @@ for(id in seq(15))
   not_na<-!all(is.na(subdata))
   grants<-raw[not_na,'Grant.Application.ID']
   subdata<-cbind(Grant.Application.ID=grants,subdata[not_na,])
-  invT<-rbind(invT,subdata)
+  investigators<-rbind(investigators,subdata)
 }
 
-# reorder by Application ID
-invT<-invT[order(invT$Grant.Application.ID),]
+setkey(investigators,'Grant.Application.ID')
 
-# remove subjects who have ID but no role
-#invT[Role=='',Role:='Unk']
-invT<-invT[!(is.na(Person.ID)&Role==''),]
-invT$Role<-factor(invT$Role)
+#remove all investigators with no role
+investigators<-investigators[Role!='',]
+investigators$Role<-factor(investigators$Role)
 
 # set person ids to zero for people with role but no id
 external_inv<-c('EXT_CHIEF_INVESTIGATOR','EXT_CHIEF_INVESTIGATOR','STUD_CHIEF_INVESTIGATOR','STUDRES','EXTERNAL_ADVISOR')
-invT[Role%in% external_inv&is.na(Person.ID),Person.ID:=0]
+investigators[Role%in% external_inv&is.na(Person.ID),Person.ID:=0]
 
+grants<-as.data.table(raw[1:26])
+setkey(grants,'Grant.Application.ID')
 
+#find out grants without investigators
+investigator_grants<-unique(investigators$Grant.Application.ID)
+grants_without_investigators<-grants[!(Grant.Application.ID %in%investigator_grants)]
+#remove them from the grants for now
+grants<-grants[!Grant.Application.ID %in% grants_without_investigators$Grant.Application.ID,]
 
-#Splitting into training and test
+source('Grants_Functions.R')
 
-grants <- data.table(raw[,1:26])
-grants$Start.date<-as.Date(grants$Start.date,format="%d/%m/%y")
-training_grants<-grants[year(Start.date)<2008,]
-training_inv<-invT[Grant.Application.ID %in%training_grants$Grant.Application.ID,]
-
-dim(training_grants)
-dim(training_inv)
-
+vars<-seq(7,7+1.9*5)
+m<-calculate_percentages(grants,vars)
+update_grants(grants,m,'RFCD')
+vars<-seq(17,17+1.9*5)
+m<-calculate_percentages(grants,vars)
+update_grants(grants,m,'SEO')
 
 ########################################SK Part########################################
-View(training_grants)
  
+source('RFCD.Code.Lookup.R')
+source('SEO.Code.Lookup.R')
 #recoding RFCD Code to create RFCD Desc
+
+class(grants)<-'data.frame'
+
+grants2<-copy(grants)
+
 for (i in 1:5)
     {
-      tmp1 <- paste0('t_rfcdcode',i)    
+      tmp1 <- paste0('t_rfcdcode',i)
       tmp2 <- paste0('RFCD.Code.',i)
-      training_grants[,tmp1] <- substr(training_grants[,eval( (tmp2))],1,2)
-      training_grants <- merge(rfcdlookup,training_grants,by.x='RFCD.Code',by.y=(tmp1),sort=T,all.y=T,incomparables=NA,NA.last=T)
-      training_grants['RFCD.Code'] <- NULL
-      training_grants[tmp1] <- NULL
-      names(training_grants)[names(training_grants) == 'RFCD.DESC'] <- paste0('RFCD.DESC.',i)
+      #grants[,tmp1] <- substr(unlist(grants[,tmp2,with=FALSE]),1,2)
+      grants[,tmp1] <- substr(unlist(grants[tmp2]),1,2)
+      grants <- merge(rfcdlookup,grants,by.x='RFCD.Code',by.y=(tmp1),sort=T,all.y=T,incomparables=NA,NA.last=T)
+      grants['RFCD.Code'] <- NULL
+      grants[tmp1] <- NULL
+      names(grants)[names(grants) == 'RFCD.DESC'] <- paste0('RFCD.DESC.',i)
     }
-
 #recoding SEO Code to create SEO Desc
 for (i in 1:5)
 {
   tmp1 <- paste0('t_seocode',i)    
   tmp2 <- paste0('SEO.Code.',i)
-  training_grants[,tmp1] <- substr(training_grants[,eval( (tmp2))],1,2)
-  training_grants <- merge(seolookup,training_grants,by.x='SEO.Code',by.y=(tmp1),sort=T,all.y=T,incomparables=NA,NA.last=T)
-  training_grants['SEO.Code'] <- NULL
-  training_grants[tmp1] <- NULL
-  names(training_grants)[names(training_grants) == 'SEO.DESC'] <- paste0('SEO.DESC.',i)
+  grants[,tmp1] <- substr(unlist(grants[tmp2]),1,2)
+  #grants[,tmp1] <- substr(grants[,eval( (tmp2))],1,2)
+  grants <- merge(seolookup,grants,by.x='SEO.Code',by.y=(tmp1),sort=T,all.y=T,incomparables=NA,NA.last=T)
+  grants['SEO.Code'] <- NULL
+  grants[tmp1] <- NULL
+  names(grants)[names(grants) == 'SEO.DESC'] <- paste0('SEO.DESC.',i)
 }
+grants<-as.data.table(grants)
+setkey(grants,'Grant.Application.ID')
+grants$Start.date<-as.Date(grants$Start.date,format="%d/%m/%y")
 
+# impute nr of years in university
+investigators[Person.ID==0,No..of.Years.in.Uni.at.Time.of.Grant:='Not Applicable']
+investigators[No..of.Years.in.Uni.at.Time.of.Grant==''&!is.na(Dept.No.),No..of.Years.in.Uni.at.Time.of.Grant:='Unknown']
+investigators[No..of.Years.in.Uni.at.Time.of.Grant==''&is.na(Dept.No.),No..of.Years.in.Uni.at.Time.of.Grant:='Not Applicable']
+investigators$No..of.Years.in.Uni.at.Time.of.Grant<-factor(investigators$No..of.Years.in.Uni.at.Time.of.Grant)
+
+# rename contract value type (contract value N is missing)
+levels(grants$Contract.Value.Band...see.note.A)<-c(LETTERS[1:13],LETTERS[15:17],'U')
+
+#combine levels of contract value into groups
+grants[Contract.Value.Band...see.note.A %in% list('A'),Contract.Value.Group:=1]
+grants[Contract.Value.Band...see.note.A %in% LETTERS[2:7],Contract.Value.Group:=2]
+grants[Contract.Value.Band...see.note.A %in% LETTERS[8:17],Contract.Value.Group:=3]
+grants[Contract.Value.Band...see.note.A %in% list('U'),Contract.Value.Group:=4]
+grants$Contract.Value.Group<-factor(grants$Contract.Value.Group)
+
+# get all poeple with phds in a grant
+levels(investigators$With.PHD)<-c(0,1)
+with_phd<-investigators[,list(Sum.PHD=sum(With.PHD=='1',na.rm=TRUE)),by='Grant.Application.ID']
+grants[,Sum.PHD:=with_phd[,Sum.PHD]]
+# get total number of successful or unsuccessful grant applications
+sum_grants<-investigators[,list(Sum.of.Successful.Grant=sum(Number.of.Successful.Grant,na.rm=TRUE),Sum.of.Unsuccessful.Grant=sum(Number.of.Unsuccessful.Grant,na.rm=TRUE)),by='Grant.Application.ID']
+grants$Sum.of.Successful.Grant<-sum_grants[,Sum.of.Successful.Grant]
+grants$Sum.of.Unsuccessful.Grant<-sum_grants[,Sum.of.Unsuccessful.Grant]
 ########################################SK Part########################################
 
-View(training_inv)
 
-tmp_sk <- subset(training_inv,select=c('Grant.Application.ID','Role','Year.of.Birth','Country.of.Birth',"A.","A","B","C"))
-setkey(tmp_sk,Grant.Application.ID)
+tmp_sk <- subset(investigators,select=c('Grant.Application.ID','Role','Year.of.Birth','Country.of.Birth',"A.","A","B","C"))
+#setkey(tmp_sk,Grant.Application.ID)
 
 
 #tmp_sk <- tmp_sk[order(tmp_sk$Grant.Application.ID),]
@@ -173,43 +202,54 @@ levels(tmp_sk$Country.of.Birth)[1] <- 'Unknown'
 
 #calculating age
 tmp_sk$Age <- (year(today()) - tmp_sk[,Year.of.Birth]) 
-
 #creating a dummy indicator where Age is NA
 tmp_sk$d_age_ind <- ifelse((is.na(tmp_sk$Age) == T),1,0)
 
 #imputing 0 where Age == NA
-tmp_sk$Age[is.na(tmp_sk$Age)==T] <- 0
-
+#tmp_sk$Age[is.na(tmp_sk$Age)==T] <- NA
+#hist(tmp_sk$Age[!tmp_sk$d_age_ind])
 #setting missing levels of Role to unknown
-levels(tmp_sk$Role)[1] <- 'UNKNOWN'
-
-dim(tmp_sk)
+#levels(tmp_sk$Role)[1] <- 'UNKNOWN'
+#levels(tmp_sk$Role)
+#dim(tmp_sk)
 #data table containing aggregate Application ID by Role
 tmp_sk_Role <- dcast(tmp_sk,Grant.Application.ID ~ Role,value.var="Role",fun=length)
 
 #data table containing aggregate Application ID by Age
 tmp_sk2 <- subset(tmp_sk,select=c('Grant.Application.ID','Age'))
 class(tmp_sk2) <- "data.frame"
-tmp_sk_Age <- aggregate(tmp_sk2["Age"],tmp_sk2["Grant.Application.ID"],mean)
-#tmp_sk_Age  <- dcast.data.table(tmp_sk,Grant.Application.ID ~ Age,fun=mean)
+tmp_sk_Age <- aggregate(tmp_sk2["Age"],tmp_sk2["Grant.Application.ID"],mean,na.rm=TRUE)
+
+# There are grants where all people have NA age
+tmp_sk_Age$Age[is.nan(tmp_sk_Age$Age)]<-NA
+hist(tmp_sk_Age$Age)
 
 #data table containing aggregate Application ID by Country of Birth
 tmp_sk_CountryofBirth <- dcast(tmp_sk,Grant.Application.ID ~ Country.of.Birth,fun=length,value.var="Country.of.Birth")
 
 #aggregating by A.,A,B,C
 tmp_sk4 <- subset(tmp_sk,select=c('Grant.Application.ID','A.',"A","B","C"))
-class(tmp_sk4) <- "data.frame"
-#check part on removing na.rm = T
-tmp_sk_4_A. <- aggregate(tmp_sk4["A."],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
-tmp_sk_4_A  <- aggregate(tmp_sk4["A"],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
-tmp_sk_4_B  <- aggregate(tmp_sk4["B"],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
-tmp_sk_4_C  <- aggregate(tmp_sk4["C"],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
 
-tmp_sk_4_A.A <- merge(tmp_sk_4_A.,tmp_sk_4_A,by.x="Grant.Application.ID",sort=T,all.y=T,incomparable=NA)
-tmp_sk_4_B.C <- merge(tmp_sk_4_B,tmp_sk_4_C,by.x="Grant.Application.ID",sort=T,all.y=T,incomparable=NA)
-  #final merge of various sum of publications by Grant.Application.ID
-tmp_skAABC <- merge(tmp_sk_4_A.A,tmp_sk_4_B.C,by.x="Grant.Application.ID",sort=T,all.y=T,incomparable=NA)
-rm(tmp_sk_4_A.A,tmp_sk_4_B.C,tmp_sk_4_A.,tmp_sk_4_A,tmp_sk_4_B,tmp_sk_4_C)
+tmp_Journals<-tmp_sk4[,list(A.=sum(A.,na.rm=TRUE),A=sum(A,na.rm=TRUE),B=sum(B,na.rm=TRUE),C=sum(C,na.rm=TRUE)),by='Grant.Application.ID']
+#result<-tmp_sk4[,list(M=mean(A.)),by='Grant.Application.ID']
 
+#class(tmp_sk4) <- "data.frame"
+# value<-dcast(tmp_sk4,'Grant.Application.ID~A.',value.var='A.',fun=sum)
+# View(tmp_sk4)
+# #check part on removing na.rm = T
+# tmp_sk_4_A. <- aggregate(tmp_sk4["A."],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
+# tmp_sk_4_A  <- aggregate(tmp_sk4["A"],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
+# tmp_sk_4_B  <- aggregate(tmp_sk4["B"],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
+# tmp_sk_4_C  <- aggregate(tmp_sk4["C"],tmp_sk2["Grant.Application.ID"],sum,na.rm=T)
+# 
+# tmp_sk_4_A.A <- merge(tmp_sk_4_A.,tmp_sk_4_A,by.x="Grant.Application.ID",sort=T,all.y=T,incomparable=NA)
+# tmp_sk_4_B.C <- merge(tmp_sk_4_B,tmp_sk_4_C,by.x="Grant.Application.ID",sort=T,all.y=T,incomparable=NA)
+#   #final merge of various sum of publications by Grant.Application.ID
+# tmp_skAABC <- merge(tmp_sk_4_A.A,tmp_sk_4_B.C,by.x="Grant.Application.ID",sort=T,all.y=T,incomparable=NA)
+# rm(tmp_sk_4_A.A,tmp_sk_4_B.C,tmp_sk_4_A.,tmp_sk_4_A,tmp_sk_4_B,tmp_sk_4_C)
+# View(tmp_skAABC)
 #finalmerging of various tmp_sk's
-n_training_inv <- cbind(tmp_sk_Role,tmp_sk_Age,tmp_sk_CountryofBirth,tmp_skAABC)
+str(tmp_sk_Role)
+?merge
+grants <- cbind(grants,tmp_sk_Role,tmp_sk_Age,tmp_sk_CountryofBirth,tmp_Journals)
+View(grants)
