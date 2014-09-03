@@ -15,7 +15,7 @@
 ##
 set.seed(108)
 
-pckg = c('caret','MASS','data.table','lubridate','plyr','sqldf','stringi')
+pckg = c('caret','MASS','data.table','lubridate','plyr','sqldf','stringi','reshape2')
 
 install.packages(pckg,dependencies=T)
 
