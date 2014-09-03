@@ -51,6 +51,7 @@ rfcd.desc <- c('SCIENCE'
                ,'HISTORY AND ARCHAEOLOGY'
                ,'PHILOSOPHY AND RELIGION'
                ,'NOT APPLICABLE'
+               ,'UNKNOWN'
                 )
 
 rfcd.id <-c(21,
@@ -77,7 +78,8 @@ rfcd.id <-c(21,
             42,
             43,
             44,
-            00
+            00,
+            99
 )
 
 rfcdlookup <- data.frame(cbind(rfcd.id,rfcd.desc))

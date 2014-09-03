@@ -20,6 +20,7 @@ pckg = c('caret','MASS','data.table','lubridate','plyr','sqldf','stringi','resha
 
 rm(list=ls())
 
+
 ## Load required libraries
 library(plyr)
 library(caret)
@@ -55,6 +56,7 @@ if(cores > 1){
 ## such as "Dept.No" instead of "Dept No"
 
 #setwd("~/SkyDrive/DSR-docs/dsrteach/grants/data")
+#setwd('/Users/skarkhanis/Dropbox/gitrepo/KaggleGrants')
 raw <- read.csv("unimelb_training.csv")
 
 ## In many cases, missing values in categorical data will be converted
@@ -126,8 +128,8 @@ update_grants(grants,m,'SEO')
  
 source('RFCD.Code.Lookup.R')
 source('SEO.Code.Lookup.R')
-#recoding RFCD Code to create RFCD Desc
 
+#recoding RFCD Code to create RFCD Desc
 class(grants)<-'data.frame'
 
 grants2<-copy(grants)
@@ -143,6 +145,7 @@ for (i in 1:5)
       grants[tmp1] <- NULL
       names(grants)[names(grants) == 'RFCD.DESC'] <- paste0('RFCD.DESC.',i)
     }
+
 #recoding SEO Code to create SEO Desc
 for (i in 1:5)
 {
@@ -155,6 +158,7 @@ for (i in 1:5)
   grants[tmp1] <- NULL
   names(grants)[names(grants) == 'SEO.DESC'] <- paste0('SEO.DESC.',i)
 }
+
 grants<-as.data.table(grants)
 setkey(grants,'Grant.Application.ID')
 grants$Start.date<-as.Date(grants$Start.date,format="%d/%m/%y")
@@ -249,7 +253,16 @@ tmp_Journals<-tmp_sk4[,list(A.=sum(A.,na.rm=TRUE),A=sum(A,na.rm=TRUE),B=sum(B,na
 # rm(tmp_sk_4_A.A,tmp_sk_4_B.C,tmp_sk_4_A.,tmp_sk_4_A,tmp_sk_4_B,tmp_sk_4_C)
 # View(tmp_skAABC)
 #finalmerging of various tmp_sk's
-str(tmp_sk_Role)
-?merge
+#str(tmp_sk_Role)
+#?merge
 grants <- cbind(grants,tmp_sk_Role,tmp_sk_Age,tmp_sk_CountryofBirth,tmp_Journals)
+
+#removing the extra Grant.Application.IDs
+cc <- which(names(grants)=='Grant.Application.ID')
+cc <- cc[2:length(cc)]
+length(cc)
+
+grants <- grants[,-(cc),with=F]
+tmp.Contract.Value.Band...see.note.A <- grants$Contract.Value.Band...see.note.A
+grants$Contract.Value.Band...see.note.A <- NULL
 View(grants)
