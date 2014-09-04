@@ -247,7 +247,7 @@ tmp_sk_Age$d_age_ind <- ifelse((is.na(tmp_sk_Age$Age) == T),1,0)
 
 #imputing age where age == NA
 tmp_sk_Age[is.na(tmp_sk_Age$Age),'Age'] <- round(mean(tmp_sk_Age$Age,na.rm=T))
-hist(tmp_sk_Age$Age)
+#hist(tmp_sk_Age$Age)
 
 #data table containing aggregate Application ID by Country of Birth
 tmp_sk_CountryofBirth <- dcast(tmp_sk,Grant.Application.ID ~ Country.of.Birth,fun=length,value.var="Country.of.Birth")
@@ -292,5 +292,19 @@ grants[,Contract.Value.Band...see.note.A:=NULL]
 #sum the publications
 grants[,Sum.Publications:=A.+A+B+C,by='Grant.Application.ID']
 
-
+# rename SEO and RFCD Descriptions to reduce string length
+sizes<-c(20,26)
+vars<- c('SEO.DESC','RFCD.DESC')
+for(i in seq(5))
+{
+  for(vid in seq(2))
+  {
+    new_var<-paste0(vars[vid],'2.',i)
+    assign<-paste0(new_var,':=',vars[vid],'.',i)
+    grants[,eval(parse(text=assign))]
+    setattr(getElement(grants,new_var),"levels",LETTERS[1:sizes[vid]])
+  }
+}
+grants$RFCD.Size<-as.factor(grants$RFCD.Size)
+grants$SEO.Size<-as.factor(grants$SEO.Size)
 
