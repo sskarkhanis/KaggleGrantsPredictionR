@@ -302,7 +302,7 @@ for(i in seq(5))
     new_var<-paste0(vars[vid],'2.',i)
     assign<-paste0(new_var,':=',vars[vid],'.',i)
     grants[,eval(parse(text=assign))]
-    setattr(getElement(grants,new_var),"levels",LETTERS[1:sizes[vid]])
+    setattr(getElement(grants,new_var),"levels",1:sizes[vid])
   }
 }
 grants$RFCD.Size<-as.factor(grants$RFCD.Size)

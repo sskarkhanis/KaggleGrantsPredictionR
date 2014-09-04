@@ -20,6 +20,8 @@ require(pROC)
 
 
 if(require('AUC')==FALSE)  install.packages('AUC',repos="http://www.freestatistics.org/cran/"); require('AUC')
+if(require('dummies')==FALSE)  install.packages('dummies',depen=T); require('dummies')
+if(require('caret')==FALSE)  install.packages('caret',depen=T); require('caret')
 if(require('FNN')==FALSE)  install.packages('FNN',repos="http://www.freestatistics.org/cran/"); require('FNN')
 if(require('glmnet')==FALSE)  install.packages('glmnet',repos="http://www.freestatistics.org/cran/"); require('glmnet')
 if(require("nnet")==FALSE) install.packages("nnet") ; library(nnet)
@@ -58,21 +60,21 @@ BasetableTEST  <- training_grants[testind,] ; class(BasetableTEST) <- 'data.fram
 #isolate the response variable
 yTRAIN <- BasetableTRAIN$Grant.Status
 #BasetableTRAIN[,Grant.Status:=NULL] 
-BasetableTRAIN$Grant.Status <- NULL
+#BasetableTRAIN$Grant.Status <- NULL
 
 yVAL <- BasetableVAL$Grant.Status
 #BasetableVAL[,Grant.Status:=NULL] 
-BasetableVAL$Grant.Status <- NULL
+#BasetableVAL$Grant.Status <- NULL
 
 yTEST <- BasetableTEST$Grant.Status
 #BasetableTEST[,Grant.Status:=NULL] 
-BasetableTEST$Grant.Status <- NULL
+#BasetableTEST$Grant.Status <- NULL
 
 table(yTRAIN);table(yVAL);table(yTEST)
 
 #if no tuning is required than we will use TRAIN + VAL as training set
 BasetableTRAINbig <- rbind(BasetableTRAIN,BasetableVAL)
-yTRAINbig <- factor(c(as.integer(as.character(yTRAIN)),as.integer(as.character(yVAL))))
+#yTRAINbig <- factor(c(as.integer(as.character(yTRAIN)),as.integer(as.character(yVAL))))
 
 #check whether we didn't make a mistake
 dim(BasetableTRAIN)
@@ -213,6 +215,20 @@ plot(LR,xvar="lambda") #Bigger lambda results in more coefficients shrunk to zer
 #cross- validate lambda
 aucstore <- numeric()
 
+for (i in 1:length(LR$lambda) ) {
+  predglmnet <- predict(LR,newx=data.matrix(BasetableVAL),type="response",s=LR$lambda[i])
+  aucstore[i] <- AUC::auc(roc(as.numeric(predglmnet),yVAL))
+}
+plot(1:length(LR$lambda),aucstore,type="l")       
+LR.lambda <- LR$lambda[which.max(aucstore)]
+
+
+#Create final model
+LR <-  glmnet(x=data.matrix(BasetableTRAINbig), y=yTRAINbig, family="binomial")
+
+
+predLRlas <- as.numeric(predict(LR,newx=data.matrix(BasetableTEST),type="response",s=LR.lambda))
+
 ##########################################################################################################
 #SVM: Support Vector Machines
 source("tuneMember.R")
@@ -253,19 +269,6 @@ SV <- svm(as.factor(yTRAINbig) ~ ., data = BasetableTRAINbig,
 #Compute the predictions for the test set
 predSV <- as.numeric(attr(predict(SV,BasetableTEST, probability=TRUE),"probabilities")[,2])
 
-for (i in 1:length(LR$lambda) ) {
-  predglmnet <- predict(LR,newx=data.matrix(BasetableVAL),type="response",s=LR$lambda[i])
-  aucstore[i] <- AUC::auc(roc(as.numeric(predglmnet),yVAL))
-}
-plot(1:length(LR$lambda),aucstore,type="l")       
-LR.lambda <- LR$lambda[which.max(aucstore)]
-
-
-#Create final model
-LR <-  glmnet(x=data.matrix(BasetableTRAINbig), y=yTRAINbig, family="binomial")
-
-
-predLRlas <- as.numeric(predict(LR,newx=data.matrix(BasetableTEST),type="response",s=LR.lambda))
 
 ###########################################################################################################
 #NN: Neural Networks
