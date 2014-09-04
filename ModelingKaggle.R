@@ -89,7 +89,7 @@ dim(BasetableTEST)
 ##########################################################################################################
 #BOOSTING
 
-?ada
+#?ada
 ABmodel <- ada(yTRAIN ~ . ,BasetableTRAIN,iter=500)
 predAB <- as.numeric(predict(ABmodel,BasetableTEST,type="probs")[,2])
 
@@ -110,7 +110,7 @@ summary(ABmodel)
 ##########################################################################################################
 #RANDOM FOREST
 
-rFmodel <- randomForest(x=BasetableTRAIN ,y=factor(yTRAIN),  ntree=1000, importance=TRUE)
+rFmodel <- randomForest(x=BasetableTRAIN ,y=factor(yTRAIN),  ntree=10, importance=TRUE)
 
 #look at the importance of the variables
 importance(rFmodel)
